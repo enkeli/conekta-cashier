@@ -12,7 +12,7 @@ class CashierTableCommand extends Command
      *
      * @var string
      */
-    protected $name = 'conekta-cashier:table';
+    protected $signature = 'conekta-cashier:table {table : The name of your billable table.}';
 
     /**
      * The console command description.
@@ -26,7 +26,7 @@ class CashierTableCommand extends Command
      *
      * @return void
      */
-    public function fire()
+    public function handle()
     {
         $fullPath = $this->createBaseMigration();
 
@@ -61,17 +61,5 @@ class CashierTableCommand extends Command
         $stub = file_get_contents(__DIR__.'/stubs/migration.stub');
 
         return str_replace('conekta_cashier_table', $this->argument('table'), $stub);
-    }
-
-    /**
-     * Get the console command arguments.
-     *
-     * @return array
-     */
-    protected function getArguments()
-    {
-        return [
-            ['table', InputArgument::REQUIRED, 'The name of your billable table.'],
-        ];
     }
 }
