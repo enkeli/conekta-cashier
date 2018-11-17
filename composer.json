@@ -1,7 +1,7 @@
 {
-    "name": "dinkbit/conekta-cashier",
-    "description": "Dinkbit Cashier nos da una interface para cobrar subscripciones con Conketa en Laravel.",
-    "keywords": ["dinkbit", "conekta", "laravel", "billing"],
+    "name": "enkeli/conekta-cashier",
+    "description": "Conekta Cashier nos da una interface para cobrar subscripciones con Conketa en Laravel. Forked from dinkbit/conekta-cashier and updated to work with laravel 5.1+ and latest Conekta SDK",
+    "keywords": ["conekta", "laravel", "billing", "cashier", "mexico", "oxxo", "spei"],
     "license": "MIT",
     "authors": [
         {
@@ -18,15 +18,18 @@
             "name": "Joseph Cohen",
             "email": "joseph.cohen@dinkbit.com",
             "role": "Developer"
+        },
+        {
+            "name": "Gabriel Vargas",
+            "email": "gabriel.vargas@nubeso.cloud",
+            "role": "Developer",
+            "homepage": "https://github.com/enkeli"
         }
     ],
     "require": {
-        "php": ">=5.4.0",
-        "conekta/conekta-php": "~2.0.4",
-        "illuminate/filesystem": "5.0.*|5.1.*|5.2.*|5.3.*|5.4.*|5.5.*",
-        "illuminate/support": "5.0.*|5.1.*|5.2.*|5.3.*|5.4.*|5.5.*",
-        "nesbot/carbon": "~1.0",
-        "symfony/http-kernel": "~2.6|~3.0"
+        "php": ">=7.2.0",
+        "conekta/conekta-php": "4.0.*",
+        "laravel/framework": "5.7.*"
     },
     "require-dev": {
         "illuminate/routing": "~5.0",
@@ -36,7 +39,7 @@
     },
     "autoload": {
         "psr-0": {
-            "Dinkbit\\ConektaCashier\\": "src/"
+            "Enkeli\\ConektaCashier\\": "src/"
         }
     },
     "extra": {

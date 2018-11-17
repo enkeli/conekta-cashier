@@ -1,6 +1,6 @@
 <?php
 
-namespace Dinkbit\ConektaCashier\Contracts;
+namespace Enkeli\ConektaCashier\Contracts;
 
 interface Billable
 {

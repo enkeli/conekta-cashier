@@ -1,9 +1,9 @@
 <?php
 
-namespace Dinkbit\ConektaCashier;
+namespace Enkeli\ConektaCashier;
 
-use Conekta;
-use Conekta_Event;
+use Conekta\Conekta;
+use Conekta\Event;
 use Exception;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\App;
@@ -13,6 +13,8 @@ use Symfony\Component\HttpFoundation\Response;
 
 class WebhookController extends Controller
 {
+    use WebhookHandlers;
+
     /**
      * Handle a Conekta webhook call.
      *
@@ -23,7 +25,7 @@ class WebhookController extends Controller
         $payload = $this->getJsonPayload();
 
         if (!$this->eventExistsOnConekta($payload['id'])) {
-            return;
+            return $this->missingEvent($payload);
         }
 
         $method = 'handle'.studly_case(str_replace('.', '_', $payload['type']));
@@ -31,7 +33,7 @@ class WebhookController extends Controller
         if (method_exists($this, $method)) {
             return $this->{$method}($payload);
         } else {
-            return $this->missingMethod();
+            return $this->missingMethod($payload);
         }
     }
 
@@ -47,28 +49,10 @@ class WebhookController extends Controller
         try {
             Conekta::setApiKey(Config::get('services.conekta.secret'));
 
-            return !is_null(Conekta_Event::where(['id' => $id]));
-        } catch (Exception $e) {
+            return !is_null(Event::where(['id' => $id]));
+        } catch (Throwable $e) {
             return false;
         }
-    }
-
-    /**
-     * Handle a failed payment from a Conekta subscription.
-     *
-     * @param array $payload
-     *
-     * @return \Symfony\Component\HttpFoundation\Response
-     */
-    protected function handleSubscriptionPaymentFailed(array $payload)
-    {
-        $billable = $this->getBillable($payload['data']['object']['customer_id']);
-
-        if ($billable) {
-            $billable->subscription()->cancel();
-        }
-
-        return new Response('Webhook Handled', 200);
     }
 
     /**
@@ -80,7 +64,19 @@ class WebhookController extends Controller
      */
     protected function getBillable($conektaId)
     {
-        return App::make('Dinkbit\ConektaCashier\BillableRepositoryInterface')->find($conektaId);
+        return App::make('Enkeli\ConektaCashier\BillableRepositoryInterface')->find($conektaId);
+    }
+
+    /**
+     * Get the billable entity instance by Payload object.
+     *
+     * @param array $payload
+     *
+     * @return \Dinkbit\ConektaCashier\BillableInterface
+     */
+    protected function getBillableFromPayload($payload)
+    {
+        return $this->getBillable($payload['data']['object']['customer_info']['customer_id']);
     }
 
     /**
@@ -94,6 +90,24 @@ class WebhookController extends Controller
     }
 
     /**
+     * Handle a failed payment from a Conekta subscription.
+     *
+     * @param array $payload
+     *
+     * @return \Symfony\Component\HttpFoundation\Response
+     */
+    protected function handleSubscriptionPaymentFailed(array $payload)
+    {
+        $billable = $this->getBillableFromPayload($payload);
+
+        if ($billable) {
+            $billable->subscription()->cancel();
+        }
+
+        return new Response('Webhook Handled', 200);
+    }
+
+    /**
      * Handle calls to missing methods on the controller.
      *
      * @param array $parameters
@@ -102,6 +116,18 @@ class WebhookController extends Controller
      */
     public function missingMethod($parameters = [])
     {
-        return new Response();
+        return new Response("", 405);
+    }
+
+    /**
+     * Handle calls to missing events.
+     *
+     * @param array $parameters
+     *
+     * @return mixed
+     */
+    public function missingEvent($parameters = [])
+    {
+        return new Response("", 404);
     }
 }

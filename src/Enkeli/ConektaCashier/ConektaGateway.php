@@ -1,13 +1,10 @@
 <?php
 
-namespace Dinkbit\ConektaCashier;
+namespace Enkeli\ConektaCashier;
 
 use Carbon\Carbon;
 use Conekta;
-use Conekta_Charge;
-use Conekta_Customer;
-use Conekta_Error;
-use Dinkbit\ConektaCashier\Contracts\Billable as BillableContract;
+use Enkeli\ConektaCashier\Contracts\Billable as BillableContract;
 use InvalidArgumentException;
 
 class ConektaGateway
@@ -15,7 +12,7 @@ class ConektaGateway
     /**
      * The billable instance.
      *
-     * @var \Dinkbit\ConektaCashier\Contracts\Billable
+     * @var \Enkeli\ConektaCashier\Contracts\Billable
      */
     protected $billable;
 
@@ -43,7 +40,7 @@ class ConektaGateway
     /**
      * Create a new Conekta gateway instance.
      *
-     * @param \Dinkbit\ConektaCashier\Contracts\Billable $billable
+     * @param \Enkeli\ConektaCashier\Contracts\Billable $billable
      * @param string|null                                $plan
      *
      * @return void
@@ -53,7 +50,8 @@ class ConektaGateway
         $this->plan = $plan;
         $this->billable = $billable;
 
-        Conekta::setApiKey($billable->getConektaKey());
+        Conekta\Conekta::setApiKey($billable->getConektaKey());
+        Conekta\Conekta::setApiVersion("2.0.0");
     }
 
     /**
@@ -66,24 +64,44 @@ class ConektaGateway
      */
     public function charge($amount, array $options = [])
     {
-        $options = array_merge([
-            'currency' => 'mxn',
-        ], $options);
+        
 
-        $options['amount'] = $amount;
+        if(!$customer = $this->getConektaCustomer()) {
+            if (array_key_exists('payment_method', $options) && $options['payment_method'] == 'oxxo_cash') {
+                $options['token'] = null;
+            } else {
+                if (!array_key_exists('token', $options) && $this->billable->hasConektaId()) {
+                    $options['card'] = $this->billable->getConektaId();
+                }
 
-        if (!array_key_exists('card', $options) && $this->billable->hasConektaId()) {
-            $options['card'] = $this->billable->getConektaId();
+                if (!array_key_exists('token', $options)) {
+                    throw new InvalidArgumentException('No payment source provided.');
+                }
+            }
+
+            $customer = $this->createConektaCustomer($options['token'], $this->billable->getCustomerInfo());
+            $this->updateLocalConektaData($customer);
+        } else if(array_key_exists('token', $options)){
+            $customer->payment_sources[0]->delete();
+            $customer->createPaymentSource(array(
+                'token_id' => $options['token'],
+                'type' => 'card'
+            ));
+            $customer = $this->getConektaCustomer();
+            $this->updateLocalConektaData($customer);
         }
 
-        if (!array_key_exists('card', $options)) {
-            throw new InvalidArgumentException('No payment source provided.');
-        }
+        
 
         try {
-            $response = Conekta_Charge::create($options);
-        } catch (Conekta_Error $e) {
-            return false;
+            $document = \Conekta\Order::create($this->billable->getDefaultOrder($customer, $amount, $options['product_name'] ?? null, $options['payment_method'] ?? null));
+            $response = ['passed' => true, 'paid' => $document->payment_status == 'paid' ? 1 : -1, 'response' => $document];
+        } catch (\Conekta\ProcessingError $error) {
+            $response = ['passed' => false, 'paid' => 0, 'response' => $error->getMessage()];
+        } catch (\Conekta\ParameterValidationError $error) {
+            $response = ['passed' => false, 'paid' => 0, 'response' => $error->getMessage()];
+        } catch (\Conekta\Handler $error) {
+            $response = ['passed' => false, 'paid' => 0, 'response' => $error->getMessage()];
         }
 
         return $response;
@@ -241,7 +259,7 @@ class ConektaGateway
     /**
      * Get the subscription end timestamp for the customer.
      *
-     * @param \Conekta_Customer $customer
+     * @param \Conekta\Customer $customer
      *
      * @return int
      */
@@ -310,12 +328,12 @@ class ConektaGateway
     /**
      * Update the local Conekta data in storage.
      *
-     * @param \Conekta_Customer $customer
+     * @param \Conekta\Customer $customer
      * @param string|null       $plan
      *
      * @return void
      */
-    public function updateLocalConektaData($customer, $plan = null)
+    public function updateLocalConektaData(\Conekta\Customer $customer, $plan = null)
     {
         $this->billable
                 ->setConektaId($customer->id)
@@ -333,13 +351,20 @@ class ConektaGateway
      * @param string $token
      * @param array  $properties
      *
-     * @return \Conekta_Customer
+     * @return \Conekta\Customer
      */
-    public function createConektaCustomer($token, array $properties = [])
+    public function createConektaCustomer($token = null, array $properties = [])
     {
-        $customer = Conekta_Customer::create(
-            array_merge(['cards' => [$token]], $properties), $this->getConektaKey()
-        );
+        if (!is_null($token)) {
+            $params = array_merge(['payment_sources' => [
+                [
+                    'token_id' => $token,
+                    'type' => "card"
+                ]
+            ]], $properties);
+        }
+        
+        $customer = Conekta\Customer::create($params, $this->getConektaKey());
 
         return $this->getConektaCustomer($customer->id);
     }
@@ -347,31 +372,36 @@ class ConektaGateway
     /**
      * Get the Conekta customer for entity.
      *
-     * @return \Conekta_Customer
+     * @return \Conekta\Customer | null
      */
     public function getConektaCustomer($id = null)
     {
-        $customer = Customer::retrieve($id ?: $this->billable->getConektaId());
-
+        try {
+            $customer = Conekta\Customer::retrieve($id ?: $this->billable->getConektaId());
+        } catch(Conekta\ParameterValidationError $e) {
+            // No customer;
+            $customer = null;
+        }
+        
         return $customer;
     }
 
     /**
      * Get the last four credit card digits for a customer.
      *
-     * @param \Conekta_Customer $customer
+     * @param \Conekta\Customer $customer
      *
      * @return string
      */
-    protected function getLastFourCardDigits($customer)
+    protected function getLastFourCardDigits(\Conekta\Customer $customer)
     {
-        if (empty($customer->cards[0])) {
+        if (empty($customer->payment_sources[0])) {
             return;
         }
 
-        if ($customer->default_card_id) {
-            foreach ($customer->cards as $card) {
-                if ($card->id == $customer->default_card_id) {
+        if ($customer->default_payment_sources_id) {
+            foreach ($customer->payment_sources as $card) {
+                if ($card->id == $customer->default_payment_sources_id) {
                     return $card->last4;
                 }
             }
@@ -379,25 +409,25 @@ class ConektaGateway
             return;
         }
 
-        return $customer->cards[0]->last4;
+        return $customer->payment_sources[0]->last4;
     }
 
     /**
      * Get the last four credit card digits for a customer.
      *
-     * @param \Conekta_Customer $customer
+     * @param \Conekta\Customer $customer
      *
      * @return string
      */
-    protected function getCardType($customer)
+    protected function getCardType(\Conekta\Customer $customer)
     {
-        if (empty($customer->cards[0])) {
+        if (empty($customer->payment_sources[0])) {
             return;
         }
 
-        if ($customer->default_card_id) {
-            foreach ($customer->cards as $card) {
-                if ($card->id == $customer->default_card_id) {
+        if ($customer->default_payment_sources_id) {
+            foreach ($customer->payment_sources as $card) {
+                if ($card->id == $customer->default_payment_sources_id) {
                     return $card->brand;
                 }
             }
@@ -405,13 +435,13 @@ class ConektaGateway
             return;
         }
 
-        return $customer->cards[0]->brand;
+        return $customer->payment_sources[0]->brand;
     }
 
     /**
      * Indicate that no trial should be enforced on the operation.
      *
-     * @return \Dinkbit\ConektaCashier\ConektaGateway
+     * @return \Enkeli\ConektaCashier\ConektaGateway
      */
     public function skipTrial()
     {
@@ -425,7 +455,7 @@ class ConektaGateway
      *
      * @param \DateTime $trialEnd
      *
-     * @return \Dinkbit\ConektaCashier\ConektaGateway
+     * @return \Enkeli\ConektaCashier\ConektaGateway
      */
     public function trialFor(\DateTime $trialEnd)
     {
@@ -447,7 +477,7 @@ class ConektaGateway
     /**
      * Maintain the days left of the current trial (if applicable).
      *
-     * @return \Dinkbit\ConektaCashier\ConektaGateway
+     * @return \Enkeli\ConektaCashier\ConektaGateway
      */
     public function maintainTrial()
     {

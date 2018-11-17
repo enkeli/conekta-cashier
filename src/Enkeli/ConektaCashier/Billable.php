@@ -1,6 +1,6 @@
 <?php
 
-namespace Dinkbit\ConektaCashier;
+namespace Enkeli\ConektaCashier;
 
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Config;
@@ -50,9 +50,9 @@ trait Billable
     /**
      * Get a new billing gateway instance for the given plan.
      *
-     * @param \Dinkbit\ConektaCashier\PlanInterface|string|null $plan
+     * @param \Enkeli\ConektaCashier\PlanInterface|string|null $plan
      *
-     * @return \Dinkbit\ConektaCashier\ConektaGateway
+     * @return \Enkeli\ConektaCashier\ConektaGateway
      */
     public function subscription($plan = null)
     {
@@ -170,8 +170,8 @@ trait Billable
      */
     public function requiresCardUpFront()
     {
-        if (isset($this->cardUpFront)) {
-            return $this->cardUpFront;
+        if (isset($this->last_four)) {
+            return false;
         }
 
         return true;
@@ -473,5 +473,54 @@ trait Billable
     public static function setConektaKey($key)
     {
         static::$conektaKey = $key;
+    }
+
+    /**
+     * Get the required info to create the customer.
+     *
+     * @return array
+     */
+    public function getCustomerInfo()
+    {
+        return [
+            'name' => $this->name,
+            'email' => $this->email
+        ];
+    }
+
+    /**
+     * Get the default order for single charges.
+     * 
+     * @param \Conekta\Customer $customer The customer to charge
+     * @param integer $amount The ammount to charge
+     * @param string $productName Change the product name
+     *
+     * @return array
+     */
+    public function getDefaultOrder($customer, $amount, $productName = null, $paymentMethod = null)
+    {
+        $productName = $productName ?? Config::get('services.conekta.default_product');
+        $paymentMethod = $paymentMethod ?? 'default';
+
+        return [
+            'currency' => $this->getCurrency(),
+            'customer_info' => [
+                'customer_id' => $customer->id
+            ],
+            'line_items' => [
+                [
+                    'name' => $productName,
+                    'unit_price' => $amount,
+                    'quantity' => 1
+                ]
+            ],
+            'charges' => [
+                [
+                    'payment_method' => [
+                        'type' => $paymentMethod
+                    ]
+                ]
+            ]
+        ];
     }
 }

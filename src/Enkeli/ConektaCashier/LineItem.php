@@ -1,6 +1,6 @@
 <?php
 
-namespace Dinkbit\ConektaCashier;
+namespace Enkeli\ConektaCashier;
 
 use Dinkbit\ConektaCashier\Contracts\Billable as BillableContract;
 
