@@ -356,7 +356,7 @@ class ConektaGateway
     public function createConektaCustomer($token = null, array $properties = [])
     {
         if (!is_null($token)) {
-            $params = array_merge(['payment_sources' => [
+            $properties = array_merge(['payment_sources' => [
                 [
                     'token_id' => $token,
                     'type' => "card"
@@ -364,7 +364,7 @@ class ConektaGateway
             ]], $properties);
         }
         
-        $customer = Conekta\Customer::create($params, $this->getConektaKey());
+        $customer = Conekta\Customer::create($properties, $this->getConektaKey());
 
         return $this->getConektaCustomer($customer->id);
     }

@@ -1,13 +1,20 @@
 # Laravel Conekta Cashier
 
-[![Build Status](https://img.shields.io/travis/dinkbit/conekta-cashier.svg?style=flat-square)](https://travis-ci.org/dinkbit/conekta-cashier)
-[![StyleCI](https://styleci.io/repos/22849643/shield)](https://styleci.io/repos/22849643)
+Port of Stripe [Laravel Cashier](https://github.com/laravel/cashier) to Conekta.
 
-[![image](https://s3.amazonaws.com/dinkbit/img/firmas/firma_dinkbit.png)](<http://dinkbit.com>)
+Fork of [dinkbit/conekta-cashier](https://github.com/dinkbit/conekta-cashier) to work with latest Laravel and Conekta's PHP SDK
 
-Port of Stripe [Laravel Cashier](https://github.com/laravel/cashier) to Conekta
+> **Note:** This is still a fork/update in progress. Tested in PHP 7.2, Laravel 5.7 and [Conekta PHP v.4.0.4](https://github.com/conekta/conekta-php)
 
-Please note the latest version of Laravel Cashier supports Laravel 5+, if you are looking for the Laravel 4 implementation see the [1.0](https://github.com/dinkbit/conekta-cashier/tree/1.0) branch.
+**What currently works:**
+
+- Single charges
+- Webhooks
+
+**Updates:** 
+
+- New event driven webhook system
+- Added Oxxo pay
 
 ___
 

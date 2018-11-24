@@ -9,12 +9,11 @@ use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Request;
+use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\Response;
 
 class WebhookController extends Controller
 {
-    use WebhookHandlers;
-
     /**
      * Handle a Conekta webhook call.
      *
@@ -25,16 +24,26 @@ class WebhookController extends Controller
         $payload = $this->getJsonPayload();
 
         if (!$this->eventExistsOnConekta($payload['id'])) {
-            return $this->missingEvent($payload);
+            return $this->missingConektaEvent($payload);
         }
 
-        $method = 'handle'.studly_case(str_replace('.', '_', $payload['type']));
+        $eventClass = studly_case(str_replace('.', '_', $payload['type']));
+        $eventClass = "\\Enkeli\\ConektaCashier\\Events\\$eventClass";
 
-        if (method_exists($this, $method)) {
-            return $this->{$method}($payload);
+        // Fire BeforeAll event.
+        event(new Events\BeforeAll($payload));
+
+        // Fire event if exists, otherwise fire Missing
+        if (class_exists($eventClass)) {
+            event(new $eventClass($payload));
         } else {
-            return $this->missingMethod($payload);
+            event(new Events\Missing($payload));
         }
+
+        // Fire AfterAll event.
+        event(new Events\AfterAll($payload));
+
+        return $this->eventDispatched();
     }
 
     /**
@@ -90,43 +99,23 @@ class WebhookController extends Controller
     }
 
     /**
-     * Handle a failed payment from a Conekta subscription.
+     * Returns a succesful response.
      *
-     * @param array $payload
-     *
-     * @return \Symfony\Component\HttpFoundation\Response
+     * @return mixed
      */
-    protected function handleSubscriptionPaymentFailed(array $payload)
+    public function eventDispatched()
     {
-        $billable = $this->getBillableFromPayload($payload);
-
-        if ($billable) {
-            $billable->subscription()->cancel();
-        }
-
-        return new Response('Webhook Handled', 200);
+        return new Response("", 200);
     }
 
     /**
-     * Handle calls to missing methods on the controller.
+     * Handle calls to missing Conekta's events.
      *
      * @param array $parameters
      *
      * @return mixed
      */
-    public function missingMethod($parameters = [])
-    {
-        return new Response("", 405);
-    }
-
-    /**
-     * Handle calls to missing events.
-     *
-     * @param array $parameters
-     *
-     * @return mixed
-     */
-    public function missingEvent($parameters = [])
+    public function missingConektaEvent($parameters = [])
     {
         return new Response("", 404);
     }
