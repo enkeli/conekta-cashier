@@ -60,7 +60,8 @@ class ConektaGateway
      * @param int   $amount
      * @param array $options
      *
-     * @return bool|mixed
+     * @return \Conekta\Order $order
+     * @throws \Conekta\Handler If something fails, a child of this exception is thrown.
      */
     public function charge($amount, array $options = [])
     {
