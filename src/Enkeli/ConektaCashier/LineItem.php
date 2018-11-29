@@ -2,7 +2,7 @@
 
 namespace Enkeli\ConektaCashier;
 
-use Dinkbit\ConektaCashier\Contracts\Billable as BillableContract;
+use Enkeli\ConektaCashier\Contracts\Billable as BillableContract;
 
 class LineItem
 {

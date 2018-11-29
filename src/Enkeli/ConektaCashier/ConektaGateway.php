@@ -82,7 +82,10 @@ class ConektaGateway
             $customer = $this->createConektaCustomer($options['token'], $this->billable->getCustomerInfo());
             $this->updateLocalConektaData($customer);
         } else if(array_key_exists('token', $options)){
-            $customer->payment_sources[0]->delete();
+            if (isset($customer->payment_sources) && is_array($customer->payment_sources) && array_key_exists($customer->payment_sources[0])) {
+                $customer->payment_sources[0]->delete();
+            }
+            
             $customer->createPaymentSource(array(
                 'token_id' => $options['token'],
                 'type' => 'card'
@@ -91,20 +94,7 @@ class ConektaGateway
             $this->updateLocalConektaData($customer);
         }
 
-        
-
-        try {
-            $document = \Conekta\Order::create($this->billable->getDefaultOrder($customer, $amount, $options['product_name'] ?? null, $options['payment_method'] ?? null));
-            $response = ['passed' => true, 'paid' => $document->payment_status == 'paid' ? 1 : -1, 'response' => $document];
-        } catch (\Conekta\ProcessingError $error) {
-            $response = ['passed' => false, 'paid' => 0, 'response' => $error->getMessage()];
-        } catch (\Conekta\ParameterValidationError $error) {
-            $response = ['passed' => false, 'paid' => 0, 'response' => $error->getMessage()];
-        } catch (\Conekta\Handler $error) {
-            $response = ['passed' => false, 'paid' => 0, 'response' => $error->getMessage()];
-        }
-
-        return $response;
+        return \Conekta\Order::create($this->billable->getDefaultOrder($customer, $amount, $options['product_name'] ?? null, $options['payment_method'] ?? null));;
     }
 
     /**
